@@ -1,100 +1,160 @@
 (function () {
   'use strict';
 
-  var root = document.querySelector('[data-jpm-popup]');
-  if (!root) return;
-  var configNode = root.querySelector('[data-jpm-config]');
-  var dialog = root.querySelector('.jpm-popup__dialog');
-  if (!configNode || !dialog) return;
+  var queueRoot = document.querySelector('[data-jpm-queue]');
+  if (!queueRoot) return;
 
-  var config;
-  try { config = JSON.parse(configNode.textContent || '{}'); } catch (error) { return; }
-  if (!config || !Number(config.id)) return;
-
-  var baseKey = 'jpm:' + String(config.id) + ':' + String(config.revision || '1');
-  var frequency = String(config.frequency || 'session');
-  var stateKey = baseKey;
-  var storage = null;
   function availableStorage(name) {
     try { return window[name] || null; } catch (error) { return null; }
   }
-  if (frequency === 'session') storage = availableStorage('sessionStorage');
-  if (frequency === 'path_session') {
-    storage = availableStorage('sessionStorage');
-    stateKey += ':path:' + encodeURIComponent(String(config.path || window.location.pathname));
-  }
-  if (frequency === 'visitor' || frequency === 'daily') storage = availableStorage('localStorage');
 
-  function readState() {
-    if (!storage) return null;
-    try { return storage.getItem(stateKey); } catch (error) { return null; }
+  function createItem(root) {
+    var configNode = root.querySelector('[data-jpm-config]');
+    var dialog = root.querySelector('.jpm-popup__dialog');
+    if (!configNode || !dialog) return null;
+    var config;
+    try { config = JSON.parse(configNode.textContent || '{}'); } catch (error) { return null; }
+    if (!config || !Number(config.id)) return null;
+
+    var frequency = String(config.frequency || 'session');
+    var stateKey = 'jpm:' + String(config.id) + ':' + String(config.revision || '1');
+    var storage = null;
+    if (frequency === 'session') storage = availableStorage('sessionStorage');
+    if (frequency === 'path_session') {
+      storage = availableStorage('sessionStorage');
+      stateKey += ':path:' + encodeURIComponent(String(config.path || window.location.pathname));
+    }
+    if (frequency === 'visitor' || frequency === 'daily') storage = availableStorage('localStorage');
+
+    return {root: root, dialog: dialog, config: config, frequency: frequency, stateKey: stateKey, storage: storage, tracked: {}};
   }
-  function shouldOpen() {
-    if (frequency === 'every_view') return true;
-    var value = readState();
+
+  function readState(item) {
+    if (!item.storage) return null;
+    try { return item.storage.getItem(item.stateKey); } catch (error) { return null; }
+  }
+
+  function shouldOpen(item) {
+    if (item.frequency === 'every_view') return true;
+    var value = readState(item);
     if (!value) return true;
-    if (frequency !== 'daily') return false;
+    if (item.frequency !== 'daily') return false;
     var seenAt = Number(value);
     return !Number.isFinite(seenAt) || Date.now() - seenAt >= 86400000;
   }
-  function markSeen() {
-    if (!storage) return;
-    try { storage.setItem(stateKey, frequency === 'daily' ? String(Date.now()) : '1'); } catch (error) {}
-  }
-  if (!shouldOpen()) return;
 
-  var previouslyFocused = null;
-  var closing = false;
-  function focusable() {
-    return Array.prototype.slice.call(dialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+  function markSeen(item) {
+    if (!item.storage) return;
+    try { item.storage.setItem(item.stateKey, item.frequency === 'daily' ? String(Date.now()) : '1'); } catch (error) {}
   }
-  function closePopup() {
-    if (closing || root.hidden) return;
+
+  function track(item, eventName) {
+    if (item.tracked[eventName] || !item.config.eventToken || !item.config.eventUrl) return;
+    item.tracked[eventName] = true;
+    var body = JSON.stringify({event: eventName, token: item.config.eventToken});
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(item.config.eventUrl, new Blob([body], {type: 'application/json'}));
+        return;
+      }
+      window.fetch(item.config.eventUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: {'Content-Type': 'application/json'},
+        body: body
+      }).catch(function () {});
+    } catch (error) {}
+  }
+
+  var items = Array.prototype.map.call(queueRoot.querySelectorAll('[data-jpm-popup]'), createItem).filter(Boolean);
+  if (!items.length) return;
+  var currentIndex = -1;
+  var current = null;
+  var closing = false;
+  var previouslyFocused = null;
+
+  function focusable(item) {
+    return Array.prototype.slice.call(item.dialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+  }
+
+  function nextEligible() {
+    for (var index = currentIndex + 1; index < items.length; index++) {
+      if (shouldOpen(items[index])) return index;
+    }
+    return -1;
+  }
+
+  function scheduleNext() {
+    var next = nextEligible();
+    if (next < 0) {
+      current = null;
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+      return;
+    }
+    currentIndex = next;
+    current = items[next];
+    window.setTimeout(openCurrent, Math.max(0, Math.min(60000, Number(current.config.delay) || 0)));
+  }
+
+  function closeCurrent() {
+    if (!current || closing || current.root.hidden) return;
     closing = true;
-    root.classList.remove('is-open');
-    root.setAttribute('aria-hidden', 'true');
+    track(current, 'close');
+    current.root.classList.remove('is-open');
+    current.root.setAttribute('aria-hidden', 'true');
     document.documentElement.classList.remove('jpm-popup-lock');
     window.setTimeout(function () {
-      root.hidden = true;
+      current.root.hidden = true;
       closing = false;
-      if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+      scheduleNext();
     }, 180);
   }
-  function openPopup() {
-    previouslyFocused = document.activeElement;
-    markSeen();
-    root.hidden = false;
-    root.setAttribute('aria-hidden', 'false');
+
+  function openCurrent() {
+    if (!current) return;
+    markSeen(current);
+    track(current, 'impression');
+    current.root.hidden = false;
+    current.root.setAttribute('aria-hidden', 'false');
     document.documentElement.classList.add('jpm-popup-lock');
     window.requestAnimationFrame(function () {
-      root.classList.add('is-open');
-      var items = focusable();
-      (items[0] || dialog).focus();
+      if (!current) return;
+      current.root.classList.add('is-open');
+      var controls = focusable(current);
+      (controls[0] || current.dialog).focus();
     });
   }
 
-  root.querySelectorAll('[data-jpm-close]').forEach(function (button) {
-    button.addEventListener('click', closePopup);
+  items.forEach(function (item) {
+    item.root.querySelectorAll('[data-jpm-close]').forEach(function (button) {
+      button.addEventListener('click', closeCurrent);
+    });
+    var overlay = item.root.querySelector('[data-jpm-overlay]');
+    if (overlay) overlay.addEventListener('click', function () {
+      if (current === item && item.config.closeOnOverlay) closeCurrent();
+    });
+    item.root.addEventListener('click', function (event) {
+      if (current === item && event.target.closest('a[href]')) track(item, 'click');
+    });
   });
-  root.querySelector('[data-jpm-overlay]')?.addEventListener('click', function () {
-    if (config.closeOnOverlay) closePopup();
-  });
+
   document.addEventListener('keydown', function (event) {
-    if (root.hidden) return;
+    if (!current || current.root.hidden) return;
     if (event.key === 'Escape') {
       event.preventDefault();
-      closePopup();
+      closeCurrent();
       return;
     }
     if (event.key !== 'Tab') return;
-    var items = focusable();
-    if (!items.length) {
+    var controls = focusable(current);
+    if (!controls.length) {
       event.preventDefault();
-      dialog.focus();
+      current.dialog.focus();
       return;
     }
-    var first = items[0];
-    var last = items[items.length - 1];
+    var first = controls[0];
+    var last = controls[controls.length - 1];
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
       last.focus();
@@ -104,5 +164,6 @@
     }
   });
 
-  window.setTimeout(openPopup, Math.max(0, Math.min(60000, Number(config.delay) || 0)));
+  previouslyFocused = document.activeElement;
+  scheduleNext();
 })();

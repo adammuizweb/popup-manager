@@ -3,10 +3,12 @@ declare(strict_types=1);
 
 if (!defined('BACKEND_PATH')) return;
 
-const JPM_VERSION = '1.0.0';
-const JPM_SCHEMA_VERSION = '1';
+const JPM_VERSION = '1.3.3';
+const JPM_SCHEMA_VERSION = '3';
 const JPM_CAMPAIGNS_TABLE = 'jpm_popup_campaigns';
+const JPM_EVENT_TOKENS_TABLE = 'jpm_popup_event_tokens';
 const JPM_PERMISSION = 'plugin.popup-manager.campaigns.manage';
+const JPM_TRUSTED_HTML_PERMISSION = 'plugin.popup-manager.html.trusted';
 
 function jpm_h(mixed $value): string
 {
@@ -33,6 +35,7 @@ function jpm_t(string $source, mixed ...$args): string
 require_once __DIR__ . '/includes/schema.php';
 require_once __DIR__ . '/includes/targeting.php';
 require_once __DIR__ . '/includes/repository.php';
+require_once __DIR__ . '/includes/events.php';
 require_once __DIR__ . '/includes/runtime.php';
 
 function jpm_is_admin_request(): bool
@@ -85,3 +88,10 @@ add_action('jy_footer', 'jpm_render_frontend');
 add_action('plugin_uninstall', 'jpm_uninstall');
 add_filter('router_path', 'jpm_capture_router_path', PHP_INT_MAX);
 add_filter('layout_slot_html', 'jpm_capture_layout_slot', PHP_INT_MAX);
+add_filter('post_data', 'jpm_capture_post_context', PHP_INT_MAX);
+add_filter('theme_post_data', 'jpm_capture_theme_context', PHP_INT_MAX);
+add_filter('collection_rows', 'jpm_capture_collection_context', PHP_INT_MAX);
+add_filter('collection_item', 'jpm_capture_collection_item_context', PHP_INT_MAX);
+add_filter('search_results', 'jpm_capture_search_context', PHP_INT_MAX);
+
+register_frontend_route('popup-manager', 'jpm_frontend_route');

@@ -4,7 +4,8 @@
 .jpm-popup__backdrop{position:absolute;inset:0;background:rgba(8,15,30,.72);backdrop-filter:blur(5px)}
 .jpm-popup__dialog{position:relative;width:min(100%,var(--jpm-max-width,720px));max-height:calc(100dvh - clamp(28px,6vw,72px));overflow:auto;border-radius:20px;background:#fff;color:#0f172a;box-shadow:0 32px 100px rgba(0,0,0,.38);transform:translateY(14px) scale(.985);transition:transform .18s ease;outline:0;overscroll-behavior:contain}
 .jpm-popup.is-open .jpm-popup__dialog{transform:translateY(0) scale(1)}
-.jpm-popup__close{position:absolute;z-index:2;top:10px;right:10px;display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid rgba(15,23,42,.14);border-radius:999px;background:rgba(255,255,255,.94);color:#0f172a;font:700 26px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(15,23,42,.15)}
+.jpm-popup__close{position:absolute;z-index:2;top:10px;right:10px;display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid rgba(15,23,42,.14);border-radius:999px;background:rgba(255,255,255,.94);color:#0f172a;cursor:pointer;box-shadow:0 4px 18px rgba(15,23,42,.15)}
+.jpm-popup__close-icon{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.25;stroke-linecap:round}
 .jpm-popup__close:hover{background:#fff;transform:scale(1.04)}
 .jpm-popup__close:focus-visible,.jpm-popup__dialog a:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
 .jpm-popup__content,.jpm-popup__image-link,.jpm-popup__image-link picture{display:block}

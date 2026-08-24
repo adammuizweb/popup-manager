@@ -36,8 +36,12 @@ $campaign = ['target_mode' => 'paths', 'include_rules' => '["/news/*"]', 'exclud
 $check(jpm_target_matches($campaign, '/news/public', false), 'included path is eligible');
 $check(!jpm_target_matches($campaign, '/news/private/item', false), 'exclude rules override includes');
 $check(jpm_target_matches(['target_mode' => 'homepage'], '/', true), 'homepage targeting uses the resolved layout context');
+$contextCampaign = ['target_mode' => 'contexts', 'context_rules' => '["list.article","single.page"]'];
+$check(jpm_target_matches($contextCampaign, '/articles', false, 'list.article'), 'selected Core page type is eligible');
+$check(!jpm_target_matches($contextCampaign, '/articles/example', false, 'single.article'), 'unselected Core page type is rejected');
+$check(jpm_context_rules_from_input(['single.page', 'forged', 'single.page']) === ['single.page'], 'page type input is allowlisted and deduplicated');
 
-foreach (['/static/file.js', '/private/media/1', '/pondasi', '/api/items', '/.well-known/test', '/sw.js', '/sitemap.xml'] as $path) {
+foreach (['/static/file.js', '/private/media/1', '/pondasi', '/api/items', '/.well-known/test', '/popup-manager/event', '/sw.js', '/sitemap.xml'] as $path) {
     $check(jpm_is_sensitive_path(null, $path), 'sensitive Core path is blocked: ' . $path);
 }
 $check(!jpm_is_sensitive_path(null, '/articles/example'), 'ordinary public paths remain eligible');
@@ -59,6 +63,22 @@ $check(!str_contains($sanitized, '<script') && !str_contains($sanitized, 'onclic
 $check(!str_contains($sanitized, 'javascript:') && str_contains($sanitized, 'class="announcement"'), 'restricted HTML removes unsafe URLs and preserves supported classes');
 $safeBlank = jpm_sanitize_html('<a href="https://example.com" target="_blank">Open</a>');
 $check(str_contains($safeBlank, 'rel="noopener noreferrer"'), 'new-tab HTML links receive opener isolation');
+$trusted = jpm_sanitize_html('<style>.embed{aspect-ratio:16/9}</style><iframe src="https://www.youtube.com/embed/example" style="width:100%" allowfullscreen srcdoc="<script>alert(1)</script>"></iframe><video controls><source src="/media/example.mp4" type="video/mp4"></video><script>alert(1)</script><div onclick="alert(1)">Embed</div>', 'trusted');
+$check(str_contains($trusted, '<style>') && str_contains($trusted, '<iframe') && str_contains($trusted, '<video'), 'trusted policy retains style, iframe, and video embeds');
+$check(!str_contains($trusted, '<script') && !str_contains($trusted, 'onclick=') && !str_contains($trusted, 'srcdoc='), 'trusted policy still removes scripts, event handlers, and iframe srcdoc');
+$check(jpm_html_has_content('<iframe src="https://example.com/embed"></iframe>'), 'embed-only trusted campaigns count as content');
+$unsafeTrusted = jpm_sanitize_html('<iframe src="javascript:alert(1)"></iframe><div style="background:url(javascript:alert(1))">Unsafe</div><a href="//example.com">External</a>', 'trusted');
+$check(!str_contains($unsafeTrusted, 'javascript:') && !str_contains($unsafeTrusted, 'href='), 'trusted policy removes executable CSS and unsafe URL forms');
+
+$previousSecret = getenv('SESSION_SECRET');
+putenv('SESSION_SECRET=popup-manager-security-contract-secret');
+require_once $pluginRoot . '/includes/events.php';
+$token = jpm_event_token(42, 'revision', 600);
+$verified = jpm_verify_event_token($token);
+$check(is_array($verified) && (int)$verified['id'] === 42, 'aggregate event token is signed, bounded, and campaign-specific');
+$check(jpm_verify_event_token($token . 'tampered') === null, 'tampered event tokens fail closed');
+if ($previousSecret === false) putenv('SESSION_SECRET');
+else putenv('SESSION_SECRET=' . $previousSecret);
 
 if ($failures !== []) {
     fwrite(STDERR, count($failures) . " security assertion(s) failed.\n");
