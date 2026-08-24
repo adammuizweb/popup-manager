@@ -1,0 +1,20 @@
+.jpm-popup[hidden]{display:none!important}
+.jpm-popup{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:clamp(14px,3vw,36px);opacity:0;visibility:hidden;transition:opacity .18s ease,visibility .18s ease}
+.jpm-popup.is-open{opacity:1;visibility:visible}
+.jpm-popup__backdrop{position:absolute;inset:0;background:rgba(8,15,30,.72);backdrop-filter:blur(5px)}
+.jpm-popup__dialog{position:relative;width:min(100%,var(--jpm-max-width,720px));max-height:calc(100dvh - clamp(28px,6vw,72px));overflow:auto;border-radius:20px;background:#fff;color:#0f172a;box-shadow:0 32px 100px rgba(0,0,0,.38);transform:translateY(14px) scale(.985);transition:transform .18s ease;outline:0;overscroll-behavior:contain}
+.jpm-popup.is-open .jpm-popup__dialog{transform:translateY(0) scale(1)}
+.jpm-popup__close{position:absolute;z-index:2;top:10px;right:10px;display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid rgba(15,23,42,.14);border-radius:999px;background:rgba(255,255,255,.94);color:#0f172a;font:700 26px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(15,23,42,.15)}
+.jpm-popup__close:hover{background:#fff;transform:scale(1.04)}
+.jpm-popup__close:focus-visible,.jpm-popup__dialog a:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
+.jpm-popup__content,.jpm-popup__image-link,.jpm-popup__image-link picture{display:block}
+.jpm-popup__image{display:block;width:100%;height:auto;border-radius:20px}
+.jpm-popup__html{padding:clamp(24px,5vw,52px);font:400 16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.jpm-popup__html>:first-child{margin-top:0}
+.jpm-popup__html>:last-child{margin-bottom:0}
+.jpm-popup__html h1,.jpm-popup__html h2,.jpm-popup__html h3{line-height:1.18;color:#0f172a}
+.jpm-popup__html a{color:#1d4ed8;font-weight:700}
+.jpm-popup__html img{max-width:100%;height:auto}
+.jpm-popup-lock{overflow:hidden}
+@media (max-width:640px){.jpm-popup{padding:12px}.jpm-popup__dialog{max-height:calc(100dvh - 24px);border-radius:16px}.jpm-popup__image{border-radius:16px}.jpm-popup__html{padding:26px 20px}.jpm-popup__close{top:8px;right:8px}}
+@media (prefers-reduced-motion:reduce){.jpm-popup,.jpm-popup__dialog{transition:none}}

@@ -1,0 +1,84 @@
+{
+  "name": "popup-manager",
+  "version": "1.0.0",
+  "title": "Popup Manager",
+  "description": "Create responsive image or HTML popup campaigns with route, schedule, and frequency targeting.",
+  "author": "Adam Muiz",
+  "author_uri": "https://adammuiz.com",
+  "plugin_uri": "https://github.com/adammuizweb/popup-manager",
+  "homepage": "https://github.com/adammuizweb/popup-manager",
+  "github_url": "https://github.com/adammuizweb/popup-manager",
+  "license": "MIT",
+  "icon": "icon.svg",
+  "requires": {
+    "jyavani": ">=2.3.74",
+    "php": ">=8.1",
+    "extensions": ["pdo", "pdo_mysql", "json", "mbstring", "dom"],
+    "plugins": {}
+  },
+  "permissions": [
+    {
+      "key": "plugin.popup-manager.campaigns.manage",
+      "label": "Manage Popup Campaigns",
+      "supports_scope": false,
+      "default_roles": ["admin"],
+      "delegable": false
+    }
+  ],
+  "admin": {
+    "pages": [
+      {
+        "route": "admin/tools/popup-manager",
+        "file": "admin/index.php",
+        "title": "Popup Manager",
+        "roles": ["admin"],
+        "permission": "plugin.popup-manager.campaigns.manage"
+      },
+      {
+        "route": "admin/tools/popup-manager/edit",
+        "file": "admin/edit.php",
+        "title": "Edit Popup Campaign",
+        "roles": ["admin"],
+        "permission": "plugin.popup-manager.campaigns.manage",
+        "hidden": true
+      },
+      {
+        "route": "admin/tools/popup-manager/save",
+        "file": "admin/save.php",
+        "title": "Save Popup Campaign",
+        "roles": ["admin"],
+        "permission": "plugin.popup-manager.campaigns.manage",
+        "hidden": true
+      },
+      {
+        "route": "admin/tools/popup-manager/delete",
+        "file": "admin/delete.php",
+        "title": "Delete Popup Campaign",
+        "roles": ["admin"],
+        "permission": "plugin.popup-manager.campaigns.manage",
+        "hidden": true
+      }
+    ],
+    "nav": [
+      {
+        "label": "Popup Manager",
+        "icon": "bell",
+        "page": "admin/tools/popup-manager",
+        "parent": "tools",
+        "roles": ["admin"]
+      }
+    ]
+  },
+  "static": {
+    "copy": [
+      {"from": "assets/css/admin.css", "to": "static/plugins/popup-manager/admin.css"},
+      {"from": "assets/js/admin.js", "to": "static/plugins/popup-manager/admin.js"},
+      {"from": "assets/css/frontend.css", "to": "static/plugins/popup-manager/frontend.css"},
+      {"from": "assets/js/frontend.js", "to": "static/plugins/popup-manager/frontend.js"}
+    ]
+  },
+  "assets": {
+    "css": [],
+    "js": []
+  }
+}
