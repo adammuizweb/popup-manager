@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 if (!defined('BACKEND_PATH')) return;
 
-const JPM_VERSION = '1.3.3';
+const JPM_VERSION = '1.3.4';
 const JPM_SCHEMA_VERSION = '3';
 const JPM_CAMPAIGNS_TABLE = 'jpm_popup_campaigns';
 const JPM_EVENT_TOKENS_TABLE = 'jpm_popup_event_tokens';
