@@ -8,7 +8,8 @@ banner, destination, or route into a site template.
 
 - Ordered campaign queues that skip paused, draft, out-of-schedule, unmatched,
   and frequency-capped campaigns.
-- Responsive image campaigns with desktop, tablet, and mobile media variants.
+- Image and HTML carousels with up to ten ordered slides per campaign.
+- Responsive image slides with desktop, tablet, and mobile media variants.
 - Restricted HTML campaigns sanitized by Jyavani Core before storage and again
   before rendering.
 - Rich Text and HTML Code authoring modes backed by the dashboard's existing
@@ -33,6 +34,12 @@ banner, destination, or route into a site template.
 Up to ten eligible campaigns are emitted in queue order. The browser opens one
 at a time and rechecks each campaign's frequency policy before display. Popup
 assets are emitted only when at least one campaign is eligible.
+
+Each campaign uses one content type across all of its slides. A one-slide
+campaign behaves like earlier releases. Existing campaign rows are read as one
+slide, while new saves keep the first slide mirrored in the legacy content
+columns for rollback compatibility. Carousel navigation supports buttons,
+position dots, and the Left/Right arrow keys.
 
 ## Requirements
 

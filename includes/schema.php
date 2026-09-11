@@ -32,7 +32,7 @@ function jpm_schema_is_ready(PDO $pdo): bool
             || !jpm_schema_table_exists($pdo, JPM_EVENT_TOKENS_TABLE)) {
             return $GLOBALS['jpm_schema_ready'] = false;
         }
-        foreach (['html_policy', 'context_rules', 'sequence_order', 'impression_count', 'close_count', 'click_count'] as $column) {
+        foreach (['html_policy', 'slides', 'context_rules', 'sequence_order', 'impression_count', 'close_count', 'click_count'] as $column) {
             if (!jpm_schema_column_exists($pdo, JPM_CAMPAIGNS_TABLE, $column)) return $GLOBALS['jpm_schema_ready'] = false;
         }
         return $GLOBALS['jpm_schema_ready'] = true;
@@ -53,6 +53,7 @@ function jpm_ensure_schema(PDO $pdo): bool
                 `status` VARCHAR(16) NOT NULL DEFAULT \'draft\',
                 `content_type` VARCHAR(16) NOT NULL DEFAULT \'image\',
                 `html_policy` VARCHAR(16) NOT NULL DEFAULT \'restricted\',
+                `slides` MEDIUMTEXT DEFAULT NULL,
                 `html_content` MEDIUMTEXT DEFAULT NULL,
                 `desktop_media_id` INT UNSIGNED DEFAULT NULL,
                 `tablet_media_id` INT UNSIGNED DEFAULT NULL,
@@ -89,6 +90,7 @@ function jpm_ensure_schema(PDO $pdo): bool
 
         $columns = [
             'html_policy' => 'VARCHAR(16) NOT NULL DEFAULT \'restricted\' AFTER `content_type`',
+            'slides' => 'MEDIUMTEXT DEFAULT NULL AFTER `html_policy`',
             'context_rules' => 'TEXT DEFAULT NULL AFTER `exclude_rules`',
             'sequence_order' => 'INT UNSIGNED NOT NULL DEFAULT 100 AFTER `priority`',
             'impression_count' => 'BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER `sequence_order`',

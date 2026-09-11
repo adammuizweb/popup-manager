@@ -9,6 +9,8 @@
 .jpm-popup__close:hover{background:#fff;transform:scale(1.04)}
 .jpm-popup__close:focus-visible,.jpm-popup__dialog a:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
 .jpm-popup__content,.jpm-popup__image-link,.jpm-popup__image-link picture{display:block}
+.jpm-popup__slides{display:grid}
+.jpm-popup__slide[hidden]{display:none!important}
 .jpm-popup__image{display:block;width:100%;height:auto;border-radius:20px}
 .jpm-popup__html{padding:clamp(24px,5vw,52px);font:400 16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .jpm-popup__html>:first-child{margin-top:0}
@@ -16,6 +18,14 @@
 .jpm-popup__html h1,.jpm-popup__html h2,.jpm-popup__html h3{line-height:1.18;color:#0f172a}
 .jpm-popup__html a{color:#1d4ed8;font-weight:700}
 .jpm-popup__html img{max-width:100%;height:auto}
+.jpm-popup__nav{display:grid;grid-template-columns:40px 1fr auto 40px;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid #e2e8f0;background:#f8fafc}
+.jpm-popup__arrow{display:grid;place-items:center;width:40px;height:36px;padding:0;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font:700 19px/1 system-ui,sans-serif;cursor:pointer}
+.jpm-popup__dots{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0}
+.jpm-popup__dots button{width:9px;height:9px;padding:0;border:0;border-radius:999px;background:#cbd5e1;cursor:pointer;transition:width .15s ease,background .15s ease}
+.jpm-popup__dots button[aria-current="true"]{width:24px;background:#2563eb}
+.jpm-popup__status{color:#64748b;font:700 11px/1 system-ui,sans-serif;white-space:nowrap}
+.jpm-popup__arrow:hover{border-color:#2563eb;color:#1d4ed8}
+.jpm-popup__arrow:focus-visible,.jpm-popup__dots button:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
 .jpm-popup-lock{overflow:hidden}
-@media (max-width:640px){.jpm-popup{padding:12px}.jpm-popup__dialog{max-height:calc(100dvh - 24px);border-radius:16px}.jpm-popup__image{border-radius:16px}.jpm-popup__html{padding:26px 20px}.jpm-popup__close{top:8px;right:8px}}
-@media (prefers-reduced-motion:reduce){.jpm-popup,.jpm-popup__dialog{transition:none}}
+@media (max-width:640px){.jpm-popup{padding:12px}.jpm-popup__dialog{max-height:calc(100dvh - 24px);border-radius:16px}.jpm-popup__image{border-radius:16px}.jpm-popup__html{padding:26px 20px}.jpm-popup__close{top:8px;right:8px}.jpm-popup__nav{grid-template-columns:36px 1fr 36px;padding:9px}.jpm-popup__arrow{width:36px;height:34px}.jpm-popup__status{display:none}}
+@media (prefers-reduced-motion:reduce){.jpm-popup,.jpm-popup__dialog,.jpm-popup__dots button{transition:none}}

@@ -60,6 +60,7 @@ $adminScriptSource = (string)file_get_contents($pluginRoot . '/assets/js/admin.j
 $frontendStyleSource = (string)file_get_contents($pluginRoot . '/assets/css/frontend.css');
 $runtimeSource = (string)file_get_contents($pluginRoot . '/includes/runtime.php');
 $schemaSource = (string)file_get_contents($pluginRoot . '/includes/schema.php');
+$repositorySource = (string)file_get_contents($pluginRoot . '/includes/repository.php');
 $eventSource = (string)file_get_contents($pluginRoot . '/public/event.php');
 $check(str_contains($pluginSource, '/static/js/add/modal-helpers.js')
     && str_contains($pluginSource, '/static/js/add/media-selector.js'), 'media selector dependencies are scoped to plugin admin requests');
@@ -78,6 +79,12 @@ $check(str_contains($runtimeSource, 'jpm-popup__close-icon')
 $check(str_contains($indexSource, 'name="action" value="delete"'), 'delete mutations use the pre-layout Core action router');
 $check(str_contains($pluginSource, "register_frontend_route('popup-manager', 'jpm_frontend_route')"), 'aggregate statistics use an explicit plugin frontend route');
 $check(str_contains($runtimeSource, 'jpm_runtime_queue') && str_contains($runtimeSource, 'count($queue) >= 10'), 'runtime emits a bounded ordered campaign queue');
+$check(str_contains($schemaSource, '`slides` MEDIUMTEXT') && str_contains($repositorySource, 'jpm_legacy_campaign_slide')
+    && str_contains($repositorySource, 'JPM_MAX_SLIDES'), 'versioned slide storage is bounded and retains legacy campaign fallback');
+$check(str_contains($editSource, 'data-jpm-slide-template') && str_contains($adminScriptSource, 'data-jpm-add-slide')
+    && str_contains($adminScriptSource, 'syncSlides'), 'campaign editor manages repeatable ordered slides');
+$check(str_contains($runtimeSource, 'data-jpm-prev') && str_contains($runtimeSource, 'data-jpm-dot')
+    && str_contains($frontendStyleSource, '.jpm-popup__nav'), 'frontend renders carousel navigation for multi-slide campaigns');
 $check(str_contains($indexSource, 'jpm_campaign_page') && str_contains($indexSource, 'jpm-bulk-form'), 'campaign list provides bounded filters, pagination, and bulk selection');
 $check(str_contains($indexSource, 'data-jpm-column-toggle') && str_contains($indexSource, 'data-jpm-action-menu'), 'campaign list provides configurable columns and scoped overflow actions');
 $check(str_contains($schemaSource, 'impression_count') && str_contains($schemaSource, 'sequence_order')

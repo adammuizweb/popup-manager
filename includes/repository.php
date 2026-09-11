@@ -16,6 +16,59 @@ function jpm_campaigns(PDO $pdo, int $limit = 200): array
     return $pdo->query('SELECT * FROM `' . JPM_CAMPAIGNS_TABLE . '` ORDER BY sequence_order ASC, priority DESC, id ASC LIMIT ' . $limit)->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
+function jpm_legacy_campaign_slide(array $campaign): array
+{
+    $type = (string)($campaign['content_type'] ?? 'image');
+    if ($type === 'html') {
+        return ['type' => 'html', 'html_content' => (string)($campaign['html_content'] ?? '')];
+    }
+    $targetUrl = jpm_normalize_target_url((string)($campaign['target_url'] ?? ''));
+    return [
+        'type' => 'image',
+        'desktop_media_id' => (int)($campaign['desktop_media_id'] ?? 0),
+        'tablet_media_id' => (int)($campaign['tablet_media_id'] ?? 0),
+        'mobile_media_id' => (int)($campaign['mobile_media_id'] ?? 0),
+        'image_alt' => (string)($campaign['image_alt'] ?? ''),
+        'target_url' => $targetUrl ?? '',
+        'open_new_tab' => (int)($campaign['open_new_tab'] ?? 0) === 1,
+    ];
+}
+
+function jpm_campaign_slides(array $campaign): array
+{
+    $stored = $campaign['slides'] ?? null;
+    if ($stored === null || (is_string($stored) && trim($stored) === '')) return [jpm_legacy_campaign_slide($campaign)];
+    if (!is_string($stored)) return [];
+    try {
+        $document = json_decode($stored, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        return [];
+    }
+    if (!is_array($document) || ($document['version'] ?? null) !== JPM_SLIDES_VERSION
+        || !isset($document['slides']) || !is_array($document['slides']) || !array_is_list($document['slides'])
+        || count($document['slides']) < 1 || count($document['slides']) > JPM_MAX_SLIDES) return [];
+    foreach ($document['slides'] as $slide) {
+        if (!is_array($slide) || !in_array($slide['type'] ?? null, ['image', 'html'], true)) return [];
+        if ($slide['type'] === 'html' && (!is_string($slide['html_content'] ?? null)
+            || strlen($slide['html_content']) > JPM_MAX_SLIDE_HTML_BYTES)) return [];
+        if ($slide['type'] === 'image') {
+            foreach (['desktop_media_id', 'tablet_media_id', 'mobile_media_id'] as $key) {
+                if (!isset($slide[$key]) || !is_int($slide[$key]) || $slide[$key] < 0) return [];
+            }
+            if (!is_string($slide['image_alt'] ?? null) || mb_strlen($slide['image_alt'], 'UTF-8') > 255
+                || !is_string($slide['target_url'] ?? null) || strlen($slide['target_url']) > 2048
+                || jpm_normalize_target_url($slide['target_url']) !== $slide['target_url']
+                || !is_bool($slide['open_new_tab'] ?? null)) return [];
+        }
+    }
+    return $document['slides'];
+}
+
+function jpm_encode_slides(array $slides): string
+{
+    return json_encode(['version' => JPM_SLIDES_VERSION, 'slides' => $slides], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+}
+
 function jpm_campaign_summary(PDO $pdo): array
 {
     $row = $pdo->query(
@@ -109,5 +162,12 @@ function jpm_campaign_media(PDO $pdo, array $campaign): array
 {
     $result = [];
     foreach (['desktop', 'tablet', 'mobile'] as $device) $result[$device] = jpm_public_media($pdo, (int)($campaign[$device . '_media_id'] ?? 0));
+    return $result;
+}
+
+function jpm_slide_media(PDO $pdo, array $slide): array
+{
+    $result = [];
+    foreach (['desktop', 'tablet', 'mobile'] as $device) $result[$device] = jpm_public_media($pdo, (int)($slide[$device . '_media_id'] ?? 0));
     return $result;
 }

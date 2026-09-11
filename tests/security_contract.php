@@ -15,6 +15,11 @@ function jpm_t(string $source, mixed ...$args): string
 }
 
 require_once $pluginRoot . '/includes/targeting.php';
+defined('JPM_SLIDES_VERSION') || define('JPM_SLIDES_VERSION', 1);
+defined('JPM_MAX_SLIDES') || define('JPM_MAX_SLIDES', 10);
+defined('JPM_MAX_SLIDE_HTML_BYTES') || define('JPM_MAX_SLIDE_HTML_BYTES', 262144);
+defined('JPM_CAMPAIGNS_TABLE') || define('JPM_CAMPAIGNS_TABLE', 'jpm_popup_campaigns');
+require_once $pluginRoot . '/includes/repository.php';
 
 $check(jpm_normalize_path('/news//release/?source=test') === '/news/release', 'request paths normalize separators and ignore query strings');
 $check(jpm_normalize_path('/safe/%2e%2e/private') === null, 'encoded traversal paths fail closed');
@@ -51,6 +56,25 @@ $check(jpm_normalize_target_url('https://example.com/admissions') === 'https://e
 $check(jpm_normalize_target_url('//example.com') === null, 'protocol-relative destinations are rejected');
 $check(jpm_normalize_target_url('javascript:alert(1)') === null, 'script destinations are rejected');
 $check(jpm_normalize_target_url('https://user:pass@example.com') === null, 'credential-bearing destinations are rejected');
+
+$legacySlides = jpm_campaign_slides(['content_type' => 'html', 'html_content' => '<p>Legacy</p>', 'slides' => null]);
+$check(count($legacySlides) === 1 && ($legacySlides[0]['html_content'] ?? '') === '<p>Legacy</p>', 'legacy campaign content normalizes to one slide');
+$legacyUnsafe = jpm_campaign_slides(['content_type' => 'image', 'target_url' => 'javascript:alert(1)', 'slides' => null]);
+$check(($legacyUnsafe[0]['target_url'] ?? null) === '', 'unsafe legacy campaign destinations are removed');
+$storedSlides = [
+    ['type' => 'html', 'html_content' => '<p>First</p>'],
+    ['type' => 'html', 'html_content' => '<p>Second</p>'],
+];
+$decodedSlides = jpm_campaign_slides(['slides' => jpm_encode_slides($storedSlides)]);
+$check($decodedSlides === $storedSlides, 'multiple versioned slides round-trip without data loss');
+$check(jpm_campaign_slides(['slides' => '{broken']) === [], 'malformed nonempty slide JSON fails closed');
+$unsafeSlideJson = json_encode(['version' => 1, 'slides' => [[
+    'type' => 'image', 'desktop_media_id' => 1, 'tablet_media_id' => 0, 'mobile_media_id' => 0,
+    'image_alt' => '', 'target_url' => 'javascript:alert(1)', 'open_new_tab' => false,
+]]]);
+$check(jpm_campaign_slides(['slides' => $unsafeSlideJson]) === [], 'unsafe stored slide destinations fail closed');
+$tooManySlides = array_fill(0, JPM_MAX_SLIDES + 1, ['type' => 'html', 'html_content' => '<p>Bounded</p>']);
+$check(jpm_campaign_slides(['slides' => jpm_encode_slides($tooManySlides)]) === [], 'stored slide count is bounded');
 
 $check(jpm_sanitize_html('<p onclick="alert(1)">Unsafe</p>') === '', 'HTML fails closed when the Core sanitizer is unavailable');
 if (!is_file($coreRoot . '/cfg/helpers/cms_content.php')) {

@@ -10,6 +10,7 @@ if ($id > 0 && !is_array($campaign)) {
 }
 $campaign ??= [
     'id' => 0, 'name' => '', 'status' => 'draft', 'content_type' => 'image', 'html_policy' => 'restricted', 'html_content' => '',
+    'slides' => null,
     'desktop_media_id' => null, 'tablet_media_id' => null, 'mobile_media_id' => null, 'image_alt' => '',
     'target_url' => '', 'open_new_tab' => 0, 'target_mode' => 'all', 'include_rules' => '[]',
     'exclude_rules' => '[]', 'context_rules' => '[]', 'frequency' => 'session', 'delay_ms' => 500, 'max_width' => 720,
@@ -21,7 +22,12 @@ if ($id > 0 && (string)$campaign['content_type'] === 'html' && (string)($campaig
     adiwira_render_404();
     return;
 }
-$media = jpm_campaign_media($pdo, $campaign);
+$slides = jpm_campaign_slides($campaign);
+if ($slides === []) $slides = [jpm_legacy_campaign_slide($campaign)];
+foreach ($slides as &$slide) {
+    if (($slide['type'] ?? '') === 'image') $slide['_media'] = jpm_slide_media($pdo, $slide);
+}
+unset($slide);
 $ruleText = static fn(mixed $value): string => implode("\n", jpm_rules_decode($value));
 $contextRules = jpm_context_rules_decode($campaign['context_rules'] ?? null);
 $contextOptions = jpm_context_options();
@@ -36,6 +42,56 @@ $starter = '<div class="announcement">' . "\n"
     . '  <p>' . jpm_t('Add useful campaign information here.') . '</p>' . "\n"
     . '  <p><a href="/">' . jpm_t('Learn more') . '</a></p>' . "\n"
     . '</div>';
+$renderSlide = static function (array $slide, int|string $index, bool $template = false) use ($imageGuides): void {
+    $type = (string)($slide['type'] ?? 'image');
+    $media = is_array($slide['_media'] ?? null) ? $slide['_media'] : [];
+    $number = $template ? 0 : (int)$index + 1;
+    $name = 'slides[' . $index . ']';
+    $editorId = 'jpm-html-content-' . $index;
+    ?>
+    <article class="jpm-slide" data-jpm-slide>
+      <header class="jpm-slide__head">
+        <strong><?=jpm_h(jpm_t('Slide %d', $number))?></strong>
+        <div class="jpm-slide__actions">
+          <button class="adam-button ghost" type="button" data-jpm-slide-up aria-label="<?=jpm_h(jpm_t('Move slide up'))?>">&uarr;</button>
+          <button class="adam-button ghost" type="button" data-jpm-slide-down aria-label="<?=jpm_h(jpm_t('Move slide down'))?>">&darr;</button>
+          <button class="adam-button ghost" type="button" data-jpm-remove-slide><?=jpm_h(jpm_t('Remove slide'))?></button>
+        </div>
+      </header>
+      <div data-jpm-slide-image <?=$type === 'html' ? 'hidden' : ''?>>
+        <div class="jpm-media-grid">
+          <?php foreach (['desktop' => jpm_t('Desktop image'), 'tablet' => jpm_t('Tablet image'), 'mobile' => jpm_t('Mobile image')] as $device => $label):
+            $selected = $media[$device] ?? null;
+          ?>
+            <div class="jpm-media" data-jpm-media>
+              <div class="jpm-media-label"><strong><?=jpm_h($label)?></strong><small><?=$device === 'desktop' ? jpm_h(jpm_t('Required')) : jpm_h(jpm_t('Optional fallback'))?></small></div>
+              <div class="jpm-media-preview"><img data-jpm-media-preview src="<?=jpm_h((string)($selected['url'] ?? ''))?>" alt="" <?=is_array($selected) ? '' : 'hidden'?>><span data-jpm-media-empty <?=is_array($selected) ? 'hidden' : ''?>><?=jpm_h(jpm_t('No image selected'))?></span></div>
+              <p class="jpm-media-guide"><?=jpm_h($imageGuides[$device])?><?php if (is_array($selected) && (int)($selected['width'] ?? 0) > 0): ?><br><strong><?=jpm_h(jpm_t('Selected: %d x %d px', (int)$selected['width'], (int)$selected['height']))?></strong><?php endif; ?></p>
+              <input type="hidden" name="<?=jpm_h($name . '[' . $device . '_media_id]')?>" data-jpm-media-id value="<?=(int)($slide[$device . '_media_id'] ?? 0)?>">
+              <div class="jpm-media-actions"><button class="adam-button" type="button" data-jpm-choose-media><?=jpm_h(jpm_t('Choose image'))?></button><button class="adam-button ghost" type="button" data-jpm-clear-media><?=jpm_h(jpm_t('Clear'))?></button></div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        <div class="jpm-two-col">
+          <label class="jpm-field"><span><?=jpm_h(jpm_t('Image alternative text'))?></span><input class="adam-input" name="<?=jpm_h($name . '[image_alt]')?>" maxlength="255" value="<?=jpm_h((string)($slide['image_alt'] ?? ''))?>"></label>
+          <label class="jpm-field"><span><?=jpm_h(jpm_t('Click destination'))?></span><input class="adam-input" type="text" name="<?=jpm_h($name . '[target_url]')?>" value="<?=jpm_h((string)($slide['target_url'] ?? ''))?>" placeholder="https://example.com/ or /admissions/"></label>
+        </div>
+        <label class="jpm-check"><input type="checkbox" name="<?=jpm_h($name . '[open_new_tab]')?>" value="1" <?=!empty($slide['open_new_tab']) ? 'checked' : ''?>> <span><?=jpm_h(jpm_t('Open image destination in a new tab'))?></span></label>
+      </div>
+      <div data-jpm-slide-html <?=$type === 'html' ? '' : 'hidden'?>>
+        <div class="jpm-html-head"><label for="<?=jpm_h($editorId)?>"><?=jpm_h(jpm_t('HTML source'))?></label><button class="adam-button ghost" type="button" data-jpm-starter><?=jpm_h(jpm_t('Insert starter'))?></button></div>
+        <div class="jpm-html-editor" data-jpm-html-editor data-rich-placeholder="<?=jpm_h(jpm_t('Compose popup content...'))?>" data-complex-title="<?=jpm_h(jpm_t('Complex HTML detected'))?>" data-complex-message="<?=jpm_h(jpm_t('Rich Text may remove or normalize scripts, styles, embeds, forms, tables, and event handlers. Stay in HTML Code to preserve the exact markup.'))?>" data-complex-confirm="<?=jpm_h(jpm_t('Switch to Rich Text'))?>" data-complex-cancel="<?=jpm_h(jpm_t('Stay in HTML Code'))?>">
+          <div class="jpm-editor-modes" role="group" aria-label="<?=jpm_h(jpm_t('HTML editor'))?>">
+            <label><input type="radio" name="<?=jpm_h($name . '[editor_mode]')?>" value="rich"> <span><?=jpm_h(jpm_t('Rich Text'))?></span></label>
+            <label><input type="radio" name="<?=jpm_h($name . '[editor_mode]')?>" value="code" checked> <span><?=jpm_h(jpm_t('HTML Code'))?></span></label>
+          </div>
+          <div data-jpm-code-area><textarea class="adam-input jpm-code" id="<?=jpm_h($editorId)?>" name="<?=jpm_h($name . '[html_content]')?>" rows="10" placeholder="<div>...</div>"><?=jpm_h((string)($slide['html_content'] ?? ''))?></textarea></div>
+          <div class="jpm-rich-area adam-quill adam-quill--auto" data-jpm-rich-area hidden><div data-jpm-rich-editor></div></div>
+        </div>
+      </div>
+    </article>
+    <?php
+};
 ?>
 <section class="jpm-admin jpm-editor" id="jpm-admin" data-jpm-editor data-starter="<?=jpm_h($starter)?>">
   <div class="jpm-head">
@@ -76,42 +132,16 @@ $starter = '<div class="announcement">' . "\n"
             <label><input type="radio" name="content_type" value="html" <?=(string)$campaign['content_type']==='html'?'checked':''?>><span><?=jpm_h(jpm_t('HTML content'))?><small><?=jpm_h(jpm_t('Flexible markup sanitized by Jyavani Core'))?></small></span></label>
           </div>
 
-          <div data-jpm-image-fields>
-            <div class="jpm-media-grid">
-              <?php foreach (['desktop' => jpm_t('Desktop image'), 'tablet' => jpm_t('Tablet image'), 'mobile' => jpm_t('Mobile image')] as $device => $label):
-                $selected = $media[$device];
-              ?>
-                <div class="jpm-media" data-jpm-media>
-                  <div class="jpm-media-label"><strong><?=jpm_h($label)?></strong><small><?=$device==='desktop'?jpm_h(jpm_t('Required')):jpm_h(jpm_t('Optional fallback'))?></small></div>
-                  <div class="jpm-media-preview"><img data-jpm-media-preview src="<?=jpm_h((string)($selected['url'] ?? ''))?>" alt="" <?=is_array($selected)?'':'hidden'?>><span data-jpm-media-empty <?=is_array($selected)?'hidden':''?>><?=jpm_h(jpm_t('No image selected'))?></span></div>
-                  <p class="jpm-media-guide"><?=jpm_h($imageGuides[$device])?><?php if (is_array($selected) && (int)($selected['width'] ?? 0) > 0): ?><br><strong><?=jpm_h(jpm_t('Selected: %d x %d px', (int)$selected['width'], (int)$selected['height']))?></strong><?php endif; ?></p>
-                  <input type="hidden" name="<?=$device?>_media_id" data-jpm-media-id value="<?=(int)($campaign[$device . '_media_id'] ?? 0)?>">
-                  <div class="jpm-media-actions"><button class="adam-button" type="button" data-jpm-choose-media><?=jpm_h(jpm_t('Choose image'))?></button><button class="adam-button ghost" type="button" data-jpm-clear-media><?=jpm_h(jpm_t('Clear'))?></button></div>
-                </div>
-              <?php endforeach; ?>
-            </div>
-            <div class="jpm-two-col">
-              <label class="jpm-field"><span><?=jpm_h(jpm_t('Image alternative text'))?></span><input class="adam-input" name="image_alt" maxlength="255" value="<?=jpm_h((string)$campaign['image_alt'])?>"></label>
-              <label class="jpm-field"><span><?=jpm_h(jpm_t('Click destination'))?></span><input class="adam-input" type="text" name="target_url" value="<?=jpm_h((string)$campaign['target_url'])?>" placeholder="https://example.com/ or /admissions/"></label>
-            </div>
-            <label class="jpm-check"><input type="checkbox" name="open_new_tab" value="1" <?=(int)$campaign['open_new_tab']===1?'checked':''?>> <span><?=jpm_h(jpm_t('Open image destination in a new tab'))?></span></label>
+          <div class="jpm-slides-head">
+            <div><strong><?=jpm_h(jpm_t('Carousel slides'))?></strong><small><?=jpm_h(jpm_t('Add up to 10 slides. A single slide works like the previous popup.'))?></small></div>
+            <button class="adam-button" type="button" data-jpm-add-slide><?=jpm_h(jpm_t('Add slide'))?></button>
           </div>
+          <div class="jpm-slides" data-jpm-slides data-slide-label="<?=jpm_h(jpm_t('Slide %d'))?>" data-max-slides="<?=JPM_MAX_SLIDES?>">
+            <?php foreach ($slides as $slideIndex => $slide) $renderSlide($slide, $slideIndex); ?>
+          </div>
+          <template data-jpm-slide-template><?php $renderSlide(['type' => 'image'], '__INDEX__', true); ?></template>
 
-          <div data-jpm-html-fields>
-            <div class="jpm-html-head"><label for="jpm-html-content"><?=jpm_h(jpm_t('HTML source'))?></label><button class="adam-button ghost" type="button" data-jpm-starter><?=jpm_h(jpm_t('Insert starter'))?></button></div>
-            <div class="jpm-html-editor" data-jpm-html-editor
-                 data-rich-placeholder="<?=jpm_h(jpm_t('Compose popup content...'))?>"
-                 data-complex-title="<?=jpm_h(jpm_t('Complex HTML detected'))?>"
-                 data-complex-message="<?=jpm_h(jpm_t('Rich Text may remove or normalize scripts, styles, embeds, forms, tables, and event handlers. Stay in HTML Code to preserve the exact markup.'))?>"
-                 data-complex-confirm="<?=jpm_h(jpm_t('Switch to Rich Text'))?>"
-                 data-complex-cancel="<?=jpm_h(jpm_t('Stay in HTML Code'))?>">
-              <div class="jpm-editor-modes" role="group" aria-label="<?=jpm_h(jpm_t('HTML editor'))?>">
-                <label><input type="radio" name="html_editor_mode" value="rich"> <span><?=jpm_h(jpm_t('Rich Text'))?></span></label>
-                <label><input type="radio" name="html_editor_mode" value="code" checked> <span><?=jpm_h(jpm_t('HTML Code'))?></span></label>
-              </div>
-              <div data-jpm-code-area><textarea class="adam-input jpm-code" id="jpm-html-content" name="html_content" rows="14" placeholder="<div>...</div>"><?=jpm_h((string)$campaign['html_content'])?></textarea></div>
-              <div class="jpm-rich-area adam-quill adam-quill--auto" data-jpm-rich-area hidden><div data-jpm-rich-editor></div></div>
-            </div>
+          <div data-jpm-html-policy <?=((string)$campaign['content_type'] === 'html') ? '' : 'hidden'?>>
             <?php if ($canTrustedHtml): ?>
               <fieldset class="jpm-html-policy">
                 <legend><?=jpm_h(jpm_t('HTML policy'))?></legend>

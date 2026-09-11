@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 if (!defined('BACKEND_PATH')) return;
 
-const JPM_VERSION = '1.3.4';
-const JPM_SCHEMA_VERSION = '3';
+const JPM_VERSION = '1.4.0';
+const JPM_SCHEMA_VERSION = '4';
+const JPM_SLIDES_VERSION = 1;
+const JPM_MAX_SLIDES = 10;
+const JPM_MAX_SLIDE_HTML_BYTES = 262144;
 const JPM_CAMPAIGNS_TABLE = 'jpm_popup_campaigns';
 const JPM_EVENT_TOKENS_TABLE = 'jpm_popup_event_tokens';
 const JPM_PERMISSION = 'plugin.popup-manager.campaigns.manage';

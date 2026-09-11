@@ -26,7 +26,18 @@
     }
     if (frequency === 'visitor' || frequency === 'daily') storage = availableStorage('localStorage');
 
-    return {root: root, dialog: dialog, config: config, frequency: frequency, stateKey: stateKey, storage: storage, tracked: {}};
+    return {
+      root: root,
+      dialog: dialog,
+      config: config,
+      frequency: frequency,
+      stateKey: stateKey,
+      storage: storage,
+      tracked: {},
+      slides: Array.prototype.slice.call(root.querySelectorAll('[data-jpm-slide]')),
+      dots: Array.prototype.slice.call(root.querySelectorAll('[data-jpm-dot]')),
+      slideIndex: 0
+    };
   }
 
   function readState(item) {
@@ -75,7 +86,25 @@
   var previouslyFocused = null;
 
   function focusable(item) {
-    return Array.prototype.slice.call(item.dialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+    return Array.prototype.slice.call(item.dialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(function (control) {
+      return !control.closest('[hidden]');
+    });
+  }
+
+  function showSlide(item, index) {
+    if (item.slides.length < 2) return;
+    var next = (index + item.slides.length) % item.slides.length;
+    item.slideIndex = next;
+    item.slides.forEach(function (slide, slideIndex) {
+      var active = slideIndex === next;
+      slide.hidden = !active;
+      slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+    });
+    item.dots.forEach(function (dot, dotIndex) {
+      dot.setAttribute('aria-current', dotIndex === next ? 'true' : 'false');
+    });
+    var status = item.root.querySelector('[data-jpm-status]');
+    if (status) status.textContent = String(next + 1) + ' / ' + String(item.slides.length);
   }
 
   function nextEligible() {
@@ -113,6 +142,7 @@
 
   function openCurrent() {
     if (!current) return;
+    showSlide(current, 0);
     markSeen(current);
     track(current, 'impression');
     current.root.hidden = false;
@@ -137,6 +167,11 @@
     item.root.addEventListener('click', function (event) {
       if (current === item && event.target.closest('a[href]')) track(item, 'click');
     });
+    item.root.querySelector('[data-jpm-prev]')?.addEventListener('click', function () { showSlide(item, item.slideIndex - 1); });
+    item.root.querySelector('[data-jpm-next]')?.addEventListener('click', function () { showSlide(item, item.slideIndex + 1); });
+    item.dots.forEach(function (dot) {
+      dot.addEventListener('click', function () { showSlide(item, Number(dot.getAttribute('data-jpm-slide-index')) || 0); });
+    });
   });
 
   document.addEventListener('keydown', function (event) {
@@ -144,6 +179,11 @@
     if (event.key === 'Escape') {
       event.preventDefault();
       closeCurrent();
+      return;
+    }
+    if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.target.closest('[data-jpm-slide]')) {
+      event.preventDefault();
+      showSlide(current, current.slideIndex + (event.key === 'ArrowRight' ? 1 : -1));
       return;
     }
     if (event.key !== 'Tab') return;

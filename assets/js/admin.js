@@ -8,21 +8,24 @@
     var editor = root.matches('[data-jpm-editor]') ? root : root.querySelector('[data-jpm-editor]');
     if (!editor) return;
     var selectedType = editor.querySelector('input[name="content_type"]:checked');
-    var imageFields = editor.querySelector('[data-jpm-image-fields]');
-    var htmlFields = editor.querySelector('[data-jpm-html-fields]');
     var isHtml = selectedType && selectedType.value === 'html';
-    if (imageFields) imageFields.hidden = isHtml;
-    if (htmlFields) htmlFields.hidden = !isHtml;
+    editor.querySelectorAll('[data-jpm-slide]').forEach(function (slide) {
+      var imageFields = slide.querySelector('[data-jpm-slide-image]');
+      var htmlFields = slide.querySelector('[data-jpm-slide-html]');
+      if (imageFields) imageFields.hidden = isHtml;
+      if (htmlFields) htmlFields.hidden = !isHtml;
+    });
+    var htmlPolicy = editor.querySelector('[data-jpm-html-policy]');
+    if (htmlPolicy) htmlPolicy.hidden = !isHtml;
 
     var targetMode = editor.querySelector('[data-jpm-target-mode]');
     var pathFields = editor.querySelector('[data-jpm-path-fields]');
     var contextFields = editor.querySelector('[data-jpm-context-fields]');
     if (pathFields) pathFields.hidden = !targetMode || targetMode.value !== 'paths';
     if (contextFields) contextFields.hidden = !targetMode || targetMode.value !== 'contexts';
-    if (isHtml && htmlFields) {
-      var htmlEditor = htmlFields.querySelector('[data-jpm-html-editor]');
-      if (htmlEditor && typeof htmlEditor._jpmRefresh === 'function') window.setTimeout(htmlEditor._jpmRefresh, 0);
-    }
+    if (isHtml) editor.querySelectorAll('[data-jpm-html-editor]').forEach(function (htmlEditor) {
+      if (typeof htmlEditor._jpmRefresh === 'function') window.setTimeout(htmlEditor._jpmRefresh, 0);
+    });
   }
 
   root.querySelectorAll('input[name="content_type"]').forEach(function (input) {
@@ -41,14 +44,14 @@
     });
   }
 
-  function initHtmlEditors() {
-    var container = root.querySelector('[data-jpm-html-editor]');
-    if (!container) return;
-    var textarea = container.querySelector('#jpm-html-content');
+  function initHtmlEditor(container) {
+    if (!container || container._jpmInitialized) return;
+    container._jpmInitialized = true;
+    var textarea = container.querySelector('textarea[name*="[html_content]"]');
     var codeArea = container.querySelector('[data-jpm-code-area]');
     var richArea = container.querySelector('[data-jpm-rich-area]');
     var richNode = container.querySelector('[data-jpm-rich-editor]');
-    var modeInputs = Array.prototype.slice.call(container.querySelectorAll('input[name="html_editor_mode"]'));
+    var modeInputs = Array.prototype.slice.call(container.querySelectorAll('.jpm-editor-modes input[type="radio"]'));
     if (!textarea || !codeArea || !richArea || !richNode) return;
     var codeMirror = null;
     var quill = null;
@@ -216,10 +219,13 @@
         syncing = false;
       }
     };
-    container._jpmRefresh = function () { if (codeMirror) codeMirror.refresh(); };
-    textarea.form?.addEventListener('submit', function () {
+    container._jpmSync = function () {
       if (currentMode() === 'rich' && quill) textarea.value = quill.root.innerHTML || '';
       else if (codeMirror) codeMirror.save();
+    };
+    container._jpmRefresh = function () { if (codeMirror) codeMirror.refresh(); };
+    textarea.form?.addEventListener('submit', function () {
+      container._jpmSync();
     });
     var preferred = 'code';
     try { preferred = window.localStorage.getItem('jpm_html_editor_mode') === 'rich' ? 'rich' : 'code'; } catch (error) {}
@@ -228,7 +234,9 @@
     applyMode(false);
   }
 
-  root.querySelectorAll('[data-jpm-media]').forEach(function (field) {
+  function initMediaField(field) {
+    if (!field || field._jpmInitialized) return;
+    field._jpmInitialized = true;
     var idInput = field.querySelector('[data-jpm-media-id]');
     var preview = field.querySelector('[data-jpm-media-preview]');
     var empty = field.querySelector('[data-jpm-media-empty]');
@@ -254,19 +262,90 @@
       });
     });
     clear?.addEventListener('click', function () { setMedia(0, ''); });
-  });
+  }
 
-  root.querySelector('[data-jpm-starter]')?.addEventListener('click', function () {
-    var textarea = root.querySelector('#jpm-html-content');
-    if (!textarea || textarea.value.trim()) return;
-    var html = root.getAttribute('data-starter') || '';
-    var editor = root.querySelector('[data-jpm-html-editor]');
-    if (editor && typeof editor._jpmSetHtml === 'function') editor._jpmSetHtml(html);
-    else textarea.value = html;
-    var mode = root.querySelector('input[name="html_editor_mode"]:checked');
-    if (mode && mode.value === 'rich') root.querySelector('[data-jpm-rich-editor] .ql-editor')?.focus();
-    else if (editor) editor.querySelector('.CodeMirror textarea')?.focus();
-    else textarea.focus();
+  function initSlide(slide) {
+    if (!slide) return;
+    slide.querySelectorAll('[data-jpm-media]').forEach(initMediaField);
+    var editor = slide.querySelector('[data-jpm-html-editor]');
+    initHtmlEditor(editor);
+    slide.querySelector('[data-jpm-starter]')?.addEventListener('click', function () {
+      var textarea = editor ? editor.querySelector('textarea[name*="[html_content]"]') : null;
+      if (!textarea || textarea.value.trim()) return;
+      var html = root.getAttribute('data-starter') || '';
+      if (typeof editor._jpmSetHtml === 'function') editor._jpmSetHtml(html);
+      else textarea.value = html;
+      var mode = editor.querySelector('.jpm-editor-modes input:checked');
+      if (mode && mode.value === 'rich') editor.querySelector('[data-jpm-rich-editor] .ql-editor')?.focus();
+      else editor.querySelector('.CodeMirror textarea')?.focus() || textarea.focus();
+    });
+  }
+
+  var slidesRoot = root.querySelector('[data-jpm-slides]');
+  var slideTemplate = root.querySelector('[data-jpm-slide-template]');
+  var addSlide = root.querySelector('[data-jpm-add-slide]');
+  function syncSlides() {
+    if (!slidesRoot) return;
+    var slides = Array.prototype.slice.call(slidesRoot.querySelectorAll('[data-jpm-slide]'));
+    var labelTemplate = slidesRoot.getAttribute('data-slide-label') || 'Slide %d';
+    slides.forEach(function (slide, index) {
+      slide.querySelectorAll('[name]').forEach(function (field) {
+        field.name = field.name.replace(/slides\[(?:\d+|__INDEX__)\]/, 'jpm_slides_tmp[' + index + ']');
+      });
+    });
+    slides.forEach(function (slide, index) {
+      slide.querySelectorAll('[name]').forEach(function (field) {
+        field.name = field.name.replace(/jpm_slides_tmp\[\d+\]/, 'slides[' + index + ']');
+      });
+      var textarea = slide.querySelector('textarea[name*="[html_content]"]');
+      if (textarea) {
+        textarea.id = 'jpm-html-content-' + index;
+        var sourceLabel = slide.querySelector('.jpm-html-head label');
+        if (sourceLabel) sourceLabel.htmlFor = textarea.id;
+      }
+      var heading = slide.querySelector('.jpm-slide__head strong');
+      if (heading) heading.textContent = labelTemplate.replace('%d', String(index + 1));
+      var up = slide.querySelector('[data-jpm-slide-up]');
+      var down = slide.querySelector('[data-jpm-slide-down]');
+      var remove = slide.querySelector('[data-jpm-remove-slide]');
+      if (up) up.disabled = index === 0;
+      if (down) down.disabled = index === slides.length - 1;
+      if (remove) remove.disabled = slides.length === 1;
+    });
+    if (addSlide) addSlide.disabled = slides.length >= Number(slidesRoot.getAttribute('data-max-slides') || 10);
+    syncEditor();
+  }
+  if (slidesRoot) {
+    slidesRoot.querySelectorAll('[data-jpm-slide]').forEach(initSlide);
+    slidesRoot.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-jpm-slide-up],[data-jpm-slide-down],[data-jpm-remove-slide]');
+      if (!button) return;
+      var slide = button.closest('[data-jpm-slide]');
+      if (!slide) return;
+      slidesRoot.querySelectorAll('[data-jpm-html-editor]').forEach(function (editor) {
+        if (typeof editor._jpmSync === 'function') editor._jpmSync();
+      });
+      if (button.matches('[data-jpm-remove-slide]')) {
+        if (slidesRoot.querySelectorAll('[data-jpm-slide]').length > 1) slide.remove();
+      } else if (button.matches('[data-jpm-slide-up]') && slide.previousElementSibling) {
+        slidesRoot.insertBefore(slide, slide.previousElementSibling);
+      } else if (button.matches('[data-jpm-slide-down]') && slide.nextElementSibling) {
+        slidesRoot.insertBefore(slide.nextElementSibling, slide);
+      }
+      syncSlides();
+    });
+  }
+  addSlide?.addEventListener('click', function () {
+    if (!slidesRoot || !slideTemplate || addSlide.disabled) return;
+    var index = slidesRoot.querySelectorAll('[data-jpm-slide]').length;
+    var wrapper = document.createElement('div');
+    wrapper.innerHTML = slideTemplate.innerHTML.replaceAll('__INDEX__', String(index));
+    var slide = wrapper.firstElementChild;
+    if (!slide) return;
+    slidesRoot.appendChild(slide);
+    initSlide(slide);
+    syncSlides();
+    slide.querySelector('button,input,textarea')?.focus();
   });
 
   root.querySelectorAll('[data-jpm-delete-form]').forEach(function (form) {
@@ -455,8 +534,7 @@
   window.addEventListener('scroll', function () { closeActionMenus(null, false); }, true);
 
   syncEditor();
-  initHtmlEditors();
-  syncEditor();
+  syncSlides();
   syncBulk();
   applyColumns();
 })();
